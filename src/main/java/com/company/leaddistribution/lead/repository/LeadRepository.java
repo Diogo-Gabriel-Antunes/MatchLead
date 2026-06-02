@@ -4,6 +4,8 @@ import com.company.leaddistribution.lead.entity.Lead;
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
 import jakarta.enterprise.context.ApplicationScoped;
 
+import java.time.LocalDateTime;
+
 @ApplicationScoped
 public class LeadRepository implements PanacheRepositoryBase<Lead, Long> {
 
@@ -21,5 +23,9 @@ public class LeadRepository implements PanacheRepositoryBase<Lead, Long> {
 
     public boolean existsByPhoneAndDifferentId(String phone, Long id) {
         return phone != null && count("phone = ?1 and id <> ?2", phone, id) > 0;
+    }
+
+    public long countAssignedTodayBySeller(Long sellerId, LocalDateTime startOfDay, LocalDateTime startOfNextDay) {
+        return count("seller.id = ?1 and createdAt >= ?2 and createdAt < ?3", sellerId, startOfDay, startOfNextDay);
     }
 }
