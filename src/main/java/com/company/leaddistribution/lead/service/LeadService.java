@@ -29,10 +29,12 @@ import java.util.Map;
 public class LeadService {
 
     private final LeadRepository leadRepository;
+    private final LeadHistoryService leadHistoryService;
     private final JsonWebToken jwt;
 
-    public LeadService(LeadRepository leadRepository, JsonWebToken jwt) {
+    public LeadService(LeadRepository leadRepository, LeadHistoryService leadHistoryService, JsonWebToken jwt) {
         this.leadRepository = leadRepository;
+        this.leadHistoryService = leadHistoryService;
         this.jwt = jwt;
     }
 
@@ -64,6 +66,7 @@ public class LeadService {
         validateDuplicates(request, null);
         Lead lead = LeadMapper.toEntity(request);
         leadRepository.persist(lead);
+        leadHistoryService.recordCreated(lead);
         return LeadMapper.toResponse(lead);
     }
 
@@ -71,7 +74,9 @@ public class LeadService {
     public LeadResponse update(Long id, LeadRequest request) {
         Lead lead = findLead(id);
         validateDuplicates(request, id);
+        String previousValue = leadSnapshot(lead);
         LeadMapper.updateEntity(lead, request);
+        leadHistoryService.recordUpdated(lead, previousValue, leadSnapshot(lead));
         return LeadMapper.toResponse(lead);
     }
 
@@ -79,8 +84,13 @@ public class LeadService {
     public LeadStatusUpdateResponse updateStatus(Long id, LeadStatusUpdateRequest request) {
         Lead lead = findLead(id);
         validateSellerVisibility(lead);
+        LeadStatus previousStatus = lead.status;
         lead.status = request.status();
         lead.updatedAt = LocalDateTime.now();
+        leadHistoryService.recordStatusChanged(lead, previousStatus.name(), lead.status.name());
+        if (previousStatus != LeadStatus.ASSIGNED && lead.status == LeadStatus.ASSIGNED) {
+            leadHistoryService.recordAssigned(lead, previousStatus.name(), "Lead atribuído");
+        }
         return new LeadStatusUpdateResponse(true, lead.status);
     }
 
@@ -149,6 +159,17 @@ public class LeadService {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private String leadSnapshot(Lead lead) {
+        return "name=%s,email=%s,phone=%s,source=%s,region=%s,status=%s".formatted(
+                lead.name,
+                lead.email,
+                lead.phone,
+                lead.source,
+                lead.region,
+                lead.status
+        );
     }
 
     private record QueryParts(String query, Map<String, Object> params) {
