@@ -173,7 +173,8 @@ POST /sellers
   "email": "joao@email.com",
   "region": "SC",
   "specialization": "AUTOMOTIVO",
-  "dailyCapacity": 50
+  "dailyCapacity": 50,
+  "active": true
 }
 ```
 
@@ -243,6 +244,61 @@ GET /sellers/{id}
   "active": true
 }
 ```
+
+---
+
+## Atualizar Vendedor
+
+### Request
+
+```http
+PUT /sellers/{id}
+```
+
+```json
+{
+  "name": "João Silva",
+  "email": "joao@email.com",
+  "region": "SC",
+  "specialization": "AUTOMOTIVO",
+  "dailyCapacity": 50,
+  "active": true
+}
+```
+
+### Response
+
+```json
+{
+  "id": 1,
+  "name": "João Silva",
+  "email": "joao@email.com",
+  "region": "SC",
+  "specialization": "AUTOMOTIVO",
+  "dailyCapacity": 50,
+  "active": true
+}
+```
+
+---
+
+## Desativar Vendedor
+
+### Request
+
+```http
+DELETE /sellers/{id}
+```
+
+### Response
+
+```http
+204 No Content
+```
+
+Observação:
+
+O endpoint realiza inativação lógica, alterando `active` para `false`.
 
 ---
 
