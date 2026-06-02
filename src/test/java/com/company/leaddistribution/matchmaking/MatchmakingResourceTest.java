@@ -17,6 +17,7 @@ import java.util.Set;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.CoreMatchers.nullValue;
 
 @QuarkusTest
@@ -45,9 +46,12 @@ class MatchmakingResourceTest {
                 .then()
                 .statusCode(200)
                 .body("leadId", equalTo(leadId.intValue()))
-                .body("score", equalTo(100))
+                .body("score", equalTo(0))
                 .body("selectedSellerId", equalTo(expectedSellerId.intValue()))
                 .body("selectedSellerName", equalTo("Joao Silva"))
+                .body("assignmentId", notNullValue())
+                .body("assignmentStatus", equalTo("PENDING"))
+                .body("leadStatus", equalTo("ASSIGNED"))
                 .body("ranking[0].position", equalTo(1))
                 .body("ranking[0].sellerId", equalTo(expectedSellerId.intValue()))
                 .body("ranking[0].rankingScore", equalTo(100))
@@ -58,16 +62,16 @@ class MatchmakingResourceTest {
                 .when().get("/api/v1/leads/{id}", leadId)
                 .then()
                 .statusCode(200)
-                .body("status", equalTo("NEW"))
-                .body("seller", nullValue());
+                .body("status", equalTo("ASSIGNED"))
+                .body("seller.id", equalTo(expectedSellerId.intValue()));
 
         given()
                 .auth().oauth2(adminToken())
                 .when().get("/api/v1/leads/{id}/history", leadId)
                 .then()
                 .statusCode(200)
-                .body("events[0].type", equalTo("LEAD_UPDATED"))
-                .body("events[0].newValue", equalTo("Matchmaking executado: 2 vendedor(es) elegível(eis)"));
+                .body("events[0].type", equalTo("LEAD_ASSIGNED"))
+                .body("events[0].newValue", equalTo("Lead atribuído ao vendedor Joao Silva"));
     }
 
     @Test
@@ -85,8 +89,11 @@ class MatchmakingResourceTest {
                 .body("score", equalTo(0))
                 .body("selectedSellerId", nullValue())
                 .body("selectedSellerName", nullValue())
+                .body("assignmentId", nullValue())
+                .body("assignmentStatus", nullValue())
+                .body("leadStatus", equalTo("NEW"))
                 .body("ranking.size()", equalTo(0))
-                .body("message", equalTo("Nenhum vendedor elegível foi encontrado"));
+                .body("message", equalTo("Nenhum vendedor elegível encontrado"));
     }
 
     @Test
@@ -103,6 +110,9 @@ class MatchmakingResourceTest {
                 .then()
                 .statusCode(200)
                 .body("selectedSellerId", equalTo(availableSellerId.intValue()))
+                .body("assignmentId", nullValue())
+                .body("assignmentStatus", nullValue())
+                .body("leadStatus", equalTo("NEW"))
                 .body("ranking[0].sellerId", equalTo(availableSellerId.intValue()))
                 .body("ranking[1].sellerId", equalTo(busySellerId.intValue()));
     }
@@ -121,7 +131,40 @@ class MatchmakingResourceTest {
                 .then()
                 .statusCode(200)
                 .body("selectedSellerId", equalTo(availableSellerId.intValue()))
+                .body("assignmentId", notNullValue())
+                .body("assignmentStatus", equalTo("PENDING"))
+                .body("leadStatus", equalTo("ASSIGNED"))
                 .body("ranking.size()", equalTo(1));
+    }
+
+    @Test
+    void shouldNotRedistributeAlreadyAssignedLead() throws Exception {
+        String region = uniqueRegion("ALREADY");
+        Long leadId = createLead(region);
+        Long firstSellerId = createSeller("First Seller", region, true, 10);
+        createSeller("Second Seller", region, true, 10);
+
+        Integer assignmentId = given()
+                .auth().oauth2(adminToken())
+                .when().post("/api/v1/matchmaking/execute/{leadId}", leadId)
+                .then()
+                .statusCode(200)
+                .body("selectedSellerId", equalTo(firstSellerId.intValue()))
+                .body("leadStatus", equalTo("ASSIGNED"))
+                .extract()
+                .path("assignmentId");
+
+        given()
+                .auth().oauth2(adminToken())
+                .when().post("/api/v1/matchmaking/execute/{leadId}", leadId)
+                .then()
+                .statusCode(200)
+                .body("selectedSellerId", equalTo(firstSellerId.intValue()))
+                .body("assignmentId", equalTo(assignmentId))
+                .body("assignmentStatus", equalTo("PENDING"))
+                .body("leadStatus", equalTo("ASSIGNED"))
+                .body("ranking.size()", equalTo(0))
+                .body("message", equalTo("Lead já atribuído"));
     }
 
     @Test

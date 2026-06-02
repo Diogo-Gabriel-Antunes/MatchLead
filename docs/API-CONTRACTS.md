@@ -491,9 +491,12 @@ POST /matchmaking/execute/{leadId}
 ```json
 {
   "leadId": 1,
-  "score": 100,
+  "score": 0,
   "selectedSellerId": 1,
   "selectedSellerName": "João Silva",
+  "assignmentId": 1,
+  "assignmentStatus": "PENDING",
+  "leadStatus": "ASSIGNED",
   "ranking": [
     {
       "position": 1,
@@ -514,8 +517,27 @@ Quando não houver vendedor elegível:
   "score": 0,
   "selectedSellerId": null,
   "selectedSellerName": null,
+  "assignmentId": null,
+  "assignmentStatus": null,
+  "leadStatus": "NEW",
   "ranking": [],
-  "message": "Nenhum vendedor elegível foi encontrado"
+  "message": "Nenhum vendedor elegível encontrado"
+}
+```
+
+Quando o lead já estiver atribuído:
+
+```json
+{
+  "leadId": 1,
+  "score": 0,
+  "selectedSellerId": 1,
+  "selectedSellerName": "João Silva",
+  "assignmentId": 1,
+  "assignmentStatus": "PENDING",
+  "leadStatus": "ASSIGNED",
+  "ranking": [],
+  "message": "Lead já atribuído"
 }
 ```
 
@@ -590,6 +612,9 @@ GET /matchmaking/ranking/{leadId}
   "score": 100,
   "selectedSellerId": 1,
   "selectedSellerName": "João Silva",
+  "assignmentId": null,
+  "assignmentStatus": null,
+  "leadStatus": "NEW",
   "ranking": [
     {
       "position": 1,
@@ -607,6 +632,10 @@ GET /matchmaking/ranking/{leadId}
   "message": "Vendedor elegível encontrado"
 }
 ```
+
+Observação:
+
+Este endpoint apenas consulta o ranking e não cria assignment.
 
 ---
 
