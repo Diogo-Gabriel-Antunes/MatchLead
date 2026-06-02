@@ -491,9 +491,31 @@ POST /matchmaking/execute/{leadId}
 ```json
 {
   "leadId": 1,
-  "score": 87,
+  "score": 100,
   "selectedSellerId": 1,
-  "selectedSellerName": "João Silva"
+  "selectedSellerName": "João Silva",
+  "ranking": [
+    {
+      "position": 1,
+      "sellerId": 1,
+      "sellerName": "João Silva",
+      "rankingScore": 100
+    }
+  ],
+  "message": "Vendedor elegível encontrado"
+}
+```
+
+Quando não houver vendedor elegível:
+
+```json
+{
+  "leadId": 1,
+  "score": 0,
+  "selectedSellerId": null,
+  "selectedSellerName": null,
+  "ranking": [],
+  "message": "Nenhum vendedor elegível foi encontrado"
 }
 ```
 
@@ -565,21 +587,24 @@ GET /matchmaking/ranking/{leadId}
 ```json
 {
   "leadId": 1,
-  "score": 87,
+  "score": 100,
+  "selectedSellerId": 1,
+  "selectedSellerName": "João Silva",
   "ranking": [
     {
       "position": 1,
       "sellerId": 1,
       "sellerName": "João Silva",
-      "rankingScore": 95
+      "rankingScore": 100
     },
     {
       "position": 2,
       "sellerId": 2,
       "sellerName": "Maria Oliveira",
-      "rankingScore": 91
+      "rankingScore": 98
     }
-  ]
+  ],
+  "message": "Vendedor elegível encontrado"
 }
 ```
 
