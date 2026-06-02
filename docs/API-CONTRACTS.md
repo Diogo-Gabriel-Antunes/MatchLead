@@ -602,15 +602,34 @@ GET /leads/{id}/history
   "leadId": 1,
   "events": [
     {
-      "type": "CREATED",
+      "type": "LEAD_CREATED",
+      "previousValue": null,
+      "newValue": "Lead criado",
       "date": "2026-01-01T10:00:00Z"
     },
     {
-      "type": "ASSIGNED",
+      "type": "LEAD_STATUS_CHANGED",
+      "previousValue": "NEW",
+      "newValue": "CONTACTED",
       "date": "2026-01-01T10:02:00Z"
     }
   ]
 }
+```
+
+Observação:
+
+Os eventos são retornados do mais recente para o mais antigo.
+
+Eventos possíveis:
+
+```text
+LEAD_CREATED
+LEAD_UPDATED
+LEAD_STATUS_CHANGED
+LEAD_ASSIGNED
+LEAD_ACCEPTED
+LEAD_REJECTED
 ```
 
 ---
