@@ -168,6 +168,156 @@ class MatchmakingResourceTest {
     }
 
     @Test
+    void shouldAcceptPendingAssignment() throws Exception {
+        String region = uniqueRegion("ACCEPT");
+        Long leadId = createLead(region);
+        String sellerEmail = uniqueEmail("accept-seller");
+        Long sellerId = createSeller("Accept Seller", sellerEmail, region, true, 10);
+        given()
+                .auth().oauth2(adminToken())
+                .when().post("/api/v1/matchmaking/execute/{leadId}", leadId)
+                .then()
+                .statusCode(200);
+
+        given()
+                .auth().oauth2(tokenFor("10", sellerEmail, "SELLER"))
+                .contentType("application/json")
+                .body("""
+                        {
+                          "leadId": %d,
+                          "sellerId": %d
+                        }
+                        """.formatted(leadId, sellerId))
+                .when().post("/api/v1/matchmaking/accept")
+                .then()
+                .statusCode(200)
+                .body("success", equalTo(true))
+                .body("status", equalTo("ACCEPTED"));
+
+        given()
+                .auth().oauth2(adminToken())
+                .when().get("/api/v1/leads/{id}/history", leadId)
+                .then()
+                .statusCode(200)
+                .body("events[0].type", equalTo("LEAD_ACCEPTED"))
+                .body("events[0].newValue", equalTo("Lead aceito pelo vendedor Accept Seller"));
+    }
+
+    @Test
+    void shouldRejectAndReprocessToNextSeller() throws Exception {
+        String region = uniqueRegion("REJECTNEXT");
+        Long leadId = createLead(region);
+        Long firstSellerId = createSeller("Reject First Seller", region, true, 10);
+        Long nextSellerId = createSeller("Reject Next Seller", region, true, 10);
+        given()
+                .auth().oauth2(adminToken())
+                .when().post("/api/v1/matchmaking/execute/{leadId}", leadId)
+                .then()
+                .statusCode(200)
+                .body("selectedSellerId", equalTo(firstSellerId.intValue()));
+
+        given()
+                .auth().oauth2(adminToken())
+                .contentType("application/json")
+                .body("""
+                        {
+                          "leadId": %d,
+                          "sellerId": %d,
+                          "reason": "Indisponivel"
+                        }
+                        """.formatted(leadId, firstSellerId))
+                .when().post("/api/v1/matchmaking/reject")
+                .then()
+                .statusCode(200)
+                .body("success", equalTo(true))
+                .body("status", equalTo("REJECTED"))
+                .body("nextAssignmentId", notNullValue())
+                .body("nextSellerId", equalTo(nextSellerId.intValue()))
+                .body("message", equalTo("Lead recusado e reprocessado para o próximo vendedor"));
+
+        given()
+                .auth().oauth2(adminToken())
+                .when().get("/api/v1/leads/{id}", leadId)
+                .then()
+                .statusCode(200)
+                .body("status", equalTo("ASSIGNED"))
+                .body("seller.id", equalTo(nextSellerId.intValue()));
+
+        given()
+                .auth().oauth2(adminToken())
+                .when().get("/api/v1/leads/{id}/history", leadId)
+                .then()
+                .statusCode(200)
+                .body("events[0].type", equalTo("LEAD_ASSIGNED"))
+                .body("events[1].type", equalTo("LEAD_REJECTED"))
+                .body("events[1].newValue", equalTo("Lead recusado pelo vendedor Reject First Seller. Motivo: Indisponivel"));
+    }
+
+    @Test
+    void shouldRejectWithoutNextSeller() throws Exception {
+        String region = uniqueRegion("REJECTNONE");
+        Long leadId = createLead(region);
+        Long sellerId = createSeller("Only Seller", region, true, 10);
+        given()
+                .auth().oauth2(adminToken())
+                .when().post("/api/v1/matchmaking/execute/{leadId}", leadId)
+                .then()
+                .statusCode(200);
+
+        given()
+                .auth().oauth2(adminToken())
+                .contentType("application/json")
+                .body("""
+                        {
+                          "leadId": %d,
+                          "sellerId": %d,
+                          "reason": "Sem agenda"
+                        }
+                        """.formatted(leadId, sellerId))
+                .when().post("/api/v1/matchmaking/reject")
+                .then()
+                .statusCode(200)
+                .body("success", equalTo(true))
+                .body("status", equalTo("REJECTED"))
+                .body("nextAssignmentId", nullValue())
+                .body("nextSellerId", nullValue())
+                .body("message", equalTo("Lead recusado, mas nenhum próximo vendedor elegível foi encontrado"));
+
+        given()
+                .auth().oauth2(adminToken())
+                .when().get("/api/v1/leads/{id}", leadId)
+                .then()
+                .statusCode(200)
+                .body("status", equalTo("NEW"))
+                .body("seller", nullValue());
+    }
+
+    @Test
+    void shouldRejectSellerOperatingAnotherSellerAssignment() throws Exception {
+        String region = uniqueRegion("FORBIDDEN");
+        Long leadId = createLead(region);
+        Long sellerId = createSeller("Protected Seller", uniqueEmail("protected-seller"), region, true, 10);
+        given()
+                .auth().oauth2(adminToken())
+                .when().post("/api/v1/matchmaking/execute/{leadId}", leadId)
+                .then()
+                .statusCode(200);
+
+        given()
+                .auth().oauth2(tokenFor("11", "another-seller@email.com", "SELLER"))
+                .contentType("application/json")
+                .body("""
+                        {
+                          "leadId": %d,
+                          "sellerId": %d
+                        }
+                        """.formatted(leadId, sellerId))
+                .when().post("/api/v1/matchmaking/accept")
+                .then()
+                .statusCode(403);
+    }
+
+    @Test
     void shouldReturnNotFoundForMissingLead() {
         given()
                 .auth().oauth2(adminToken())
@@ -194,11 +344,15 @@ class MatchmakingResourceTest {
     }
 
     private Long createSeller(String name, String region, boolean active, int dailyCapacity) throws Exception {
+        return createSeller(name, uniqueEmail("seller"), region, active, dailyCapacity);
+    }
+
+    private Long createSeller(String name, String email, String region, boolean active, int dailyCapacity) throws Exception {
         userTransaction.begin();
         try {
             Seller seller = new Seller();
             seller.name = name;
-            seller.email = uniqueEmail("seller");
+            seller.email = email;
             seller.region = region;
             seller.specialization = "AUTOMOTIVO";
             seller.dailyCapacity = dailyCapacity;
