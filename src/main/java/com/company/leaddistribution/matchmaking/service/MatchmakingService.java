@@ -97,7 +97,7 @@ public class MatchmakingService {
             );
         }
 
-        Assignment nextAssignment = assignmentService.assignLead(lead, nextCandidates.getFirst().seller());
+        Assignment nextAssignment = assignmentService.reassignLead(lead, nextCandidates.getFirst().seller());
         return new RejectAssignmentResponse(
                 true,
                 rejectedAssignment.status,

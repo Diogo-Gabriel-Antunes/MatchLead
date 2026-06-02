@@ -7,6 +7,8 @@ import com.company.leaddistribution.auth.entity.Role;
 import com.company.leaddistribution.lead.entity.Lead;
 import com.company.leaddistribution.lead.entity.LeadStatus;
 import com.company.leaddistribution.lead.service.LeadHistoryService;
+import com.company.leaddistribution.notification.entity.NotificationEvent;
+import com.company.leaddistribution.notification.service.NotificationService;
 import com.company.leaddistribution.seller.entity.Seller;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.ws.rs.ForbiddenException;
@@ -24,19 +26,30 @@ public class AssignmentService {
 
     private final AssignmentRepository assignmentRepository;
     private final LeadHistoryService leadHistoryService;
+    private final NotificationService notificationService;
     private final JsonWebToken jwt;
 
     public AssignmentService(
             AssignmentRepository assignmentRepository,
             LeadHistoryService leadHistoryService,
+            NotificationService notificationService,
             JsonWebToken jwt
     ) {
         this.assignmentRepository = assignmentRepository;
         this.leadHistoryService = leadHistoryService;
+        this.notificationService = notificationService;
         this.jwt = jwt;
     }
 
     public Assignment assignLead(Lead lead, Seller seller) {
+        return assignLead(lead, seller, NotificationEvent.LEAD_ASSIGNED);
+    }
+
+    public Assignment reassignLead(Lead lead, Seller seller) {
+        return assignLead(lead, seller, NotificationEvent.LEAD_REASSIGNED);
+    }
+
+    private Assignment assignLead(Lead lead, Seller seller, NotificationEvent notificationEvent) {
         if (assignmentRepository.hasActiveAssignment(lead.id)) {
             throw new WebApplicationException("Lead already has an active assignment", Response.Status.CONFLICT);
         }
@@ -56,6 +69,11 @@ public class AssignmentService {
 
         assignmentRepository.persist(assignment);
         leadHistoryService.recordAssigned(lead, null, "Lead atribuído ao vendedor " + seller.name);
+        if (notificationEvent == NotificationEvent.LEAD_REASSIGNED) {
+            notificationService.notifyLeadReassigned(lead, seller);
+        } else {
+            notificationService.notifyLeadAssigned(lead, seller);
+        }
         return assignment;
     }
 
@@ -76,6 +94,7 @@ public class AssignmentService {
         assignment.lead.updatedAt = now;
 
         leadHistoryService.recordAccepted(assignment.lead, null, "Lead aceito pelo vendedor " + assignment.seller.name);
+        notificationService.notifyLeadAccepted(assignment.lead, assignment.seller);
         return assignment;
     }
 
@@ -93,6 +112,7 @@ public class AssignmentService {
             message = message + ". Motivo: " + reason.trim();
         }
         leadHistoryService.recordRejected(assignment.lead, null, message);
+        notificationService.notifyLeadRejected(assignment.lead, assignment.seller);
         return assignment;
     }
 

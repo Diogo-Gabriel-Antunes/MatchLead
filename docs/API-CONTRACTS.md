@@ -703,6 +703,76 @@ LEAD_REJECTED
 
 ---
 
+# NOTIFICATIONS
+
+## Listar Notificações
+
+### Request
+
+```http
+GET /notifications
+```
+
+Filtros:
+
+```http
+?leadId=10
+&sellerId=3
+&event=LEAD_ASSIGNED
+&status=SENT
+&page=0
+&size=20
+```
+
+### Response
+
+```json
+{
+  "content": [
+    {
+      "id": 1,
+      "leadId": 10,
+      "sellerId": 3,
+      "recipient": "seller@email.com",
+      "type": "EMAIL",
+      "event": "LEAD_ASSIGNED",
+      "status": "SENT",
+      "sentAt": "2026-01-01T10:00:00Z"
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 1,
+  "totalPages": 1
+}
+```
+
+Eventos possíveis:
+
+```text
+LEAD_ASSIGNED
+LEAD_ACCEPTED
+LEAD_REJECTED
+LEAD_REASSIGNED
+```
+
+Tipos possíveis:
+
+```text
+EMAIL
+WEBHOOK
+```
+
+Status possíveis:
+
+```text
+PENDING
+SENT
+FAILED
+```
+
+---
+
 # DASHBOARD
 
 ## Resumo
