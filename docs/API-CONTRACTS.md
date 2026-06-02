@@ -327,8 +327,15 @@ POST /leads
 ```json
 {
   "id": 1,
+  "name": "Maria Souza",
+  "email": "maria@email.com",
+  "phone": "47999999999",
+  "source": "FACEBOOK",
+  "region": "SC",
   "status": "NEW",
-  "createdAt": "2026-01-01T10:00:00Z"
+  "seller": null,
+  "createdAt": "2026-01-01T10:00:00Z",
+  "updatedAt": "2026-01-01T10:00:00Z"
 }
 ```
 
@@ -348,6 +355,7 @@ Filtros:
 ?status=NEW
 &sellerId=1
 &region=SC
+&source=FACEBOOK
 &page=0
 &size=20
 ```
@@ -360,10 +368,11 @@ Filtros:
     {
       "id": 1,
       "name": "Maria Souza",
+      "source": "FACEBOOK",
+      "region": "SC",
       "status": "ASSIGNED",
-      "score": 87,
       "sellerId": 1,
-      "sellerName": "João Silva"
+      "createdAt": "2026-01-01T10:00:00Z"
     }
   ],
   "page": 0,
@@ -394,11 +403,49 @@ GET /leads/{id}
   "source": "FACEBOOK",
   "region": "SC",
   "status": "ASSIGNED",
-  "score": 87,
   "seller": {
     "id": 1,
     "name": "João Silva"
-  }
+  },
+  "createdAt": "2026-01-01T10:00:00Z",
+  "updatedAt": "2026-01-01T10:00:00Z"
+}
+```
+
+---
+
+## Atualizar Lead
+
+### Request
+
+```http
+PUT /leads/{id}
+```
+
+```json
+{
+  "name": "Maria Souza",
+  "email": "maria@email.com",
+  "phone": "47999999999",
+  "source": "GOOGLE",
+  "region": "PR"
+}
+```
+
+### Response
+
+```json
+{
+  "id": 1,
+  "name": "Maria Souza",
+  "email": "maria@email.com",
+  "phone": "47999999999",
+  "source": "GOOGLE",
+  "region": "PR",
+  "status": "NEW",
+  "seller": null,
+  "createdAt": "2026-01-01T10:00:00Z",
+  "updatedAt": "2026-01-01T10:05:00Z"
 }
 ```
 
@@ -422,7 +469,8 @@ PATCH /leads/{id}/status
 
 ```json
 {
-  "success": true
+  "success": true,
+  "status": "CONTACTED"
 }
 ```
 
