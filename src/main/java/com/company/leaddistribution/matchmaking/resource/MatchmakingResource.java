@@ -1,8 +1,14 @@
 package com.company.leaddistribution.matchmaking.resource;
 
 import com.company.leaddistribution.matchmaking.dto.MatchmakingResponse;
+import com.company.leaddistribution.matchmaking.dto.AcceptAssignmentResponse;
+import com.company.leaddistribution.matchmaking.dto.AssignmentActionRequest;
+import com.company.leaddistribution.matchmaking.dto.RejectAssignmentRequest;
+import com.company.leaddistribution.matchmaking.dto.RejectAssignmentResponse;
 import com.company.leaddistribution.matchmaking.service.MatchmakingService;
 import jakarta.annotation.security.RolesAllowed;
+import jakarta.validation.Valid;
+import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
@@ -37,5 +43,23 @@ public class MatchmakingResource {
     @Operation(summary = "Get matchmaking ranking for a lead")
     public MatchmakingResponse ranking(@PathParam("leadId") Long leadId) {
         return matchmakingService.ranking(leadId);
+    }
+
+    @POST
+    @Path("/accept")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @RolesAllowed({"ADMIN", "MANAGER", "SELLER"})
+    @Operation(summary = "Accept lead assignment")
+    public AcceptAssignmentResponse accept(@Valid AssignmentActionRequest request) {
+        return matchmakingService.accept(request.leadId(), request.sellerId());
+    }
+
+    @POST
+    @Path("/reject")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @RolesAllowed({"ADMIN", "MANAGER", "SELLER"})
+    @Operation(summary = "Reject lead assignment")
+    public RejectAssignmentResponse reject(@Valid RejectAssignmentRequest request) {
+        return matchmakingService.reject(request.leadId(), request.sellerId(), request.reason());
     }
 }

@@ -585,12 +585,27 @@ POST /matchmaking/reject
 }
 ```
 
-### Response
+Quando houver próximo vendedor elegível:
 
 ```json
 {
   "success": true,
-  "status": "REJECTED"
+  "status": "REJECTED",
+  "nextAssignmentId": 2,
+  "nextSellerId": 3,
+  "message": "Lead recusado e reprocessado para o próximo vendedor"
+}
+```
+
+Quando não houver próximo vendedor elegível:
+
+```json
+{
+  "success": true,
+  "status": "REJECTED",
+  "nextAssignmentId": null,
+  "nextSellerId": null,
+  "message": "Lead recusado, mas nenhum próximo vendedor elegível foi encontrado"
 }
 ```
 

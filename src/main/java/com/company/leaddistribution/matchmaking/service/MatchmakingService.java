@@ -5,6 +5,8 @@ import com.company.leaddistribution.assignment.service.AssignmentService;
 import com.company.leaddistribution.lead.entity.LeadStatus;
 import com.company.leaddistribution.lead.entity.Lead;
 import com.company.leaddistribution.lead.repository.LeadRepository;
+import com.company.leaddistribution.matchmaking.dto.AcceptAssignmentResponse;
+import com.company.leaddistribution.matchmaking.dto.RejectAssignmentResponse;
 import com.company.leaddistribution.matchmaking.dto.MatchmakingResponse;
 import com.company.leaddistribution.matchmaking.dto.SellerRankingResponse;
 import com.company.leaddistribution.matchmaking.mapper.MatchmakingMapper;
@@ -25,6 +27,8 @@ public class MatchmakingService {
     private static final String NO_ELIGIBLE_SELLER_ASSIGNMENT_MESSAGE = "Nenhum vendedor elegível encontrado";
     private static final String ELIGIBLE_SELLER_FOUND_MESSAGE = "Vendedor elegível encontrado";
     private static final String LEAD_ALREADY_ASSIGNED_MESSAGE = "Lead já atribuído";
+    private static final String REJECTED_AND_REPROCESSED_MESSAGE = "Lead recusado e reprocessado para o próximo vendedor";
+    private static final String REJECTED_WITHOUT_NEXT_SELLER_MESSAGE = "Lead recusado, mas nenhum próximo vendedor elegível foi encontrado";
 
     private final LeadRepository leadRepository;
     private final SellerRepository sellerRepository;
@@ -65,6 +69,42 @@ public class MatchmakingService {
         Lead lead = leadRepository.findByIdOptional(leadId)
                 .orElseThrow(() -> new NotFoundException("Lead not found"));
         return buildResponse(lead);
+    }
+
+    @Transactional
+    public AcceptAssignmentResponse accept(Long leadId, Long sellerId) {
+        Assignment assignment = assignmentService.accept(leadId, sellerId);
+        return new AcceptAssignmentResponse(true, assignment.status);
+    }
+
+    @Transactional
+    public RejectAssignmentResponse reject(Long leadId, Long sellerId, String reason) {
+        Assignment rejectedAssignment = assignmentService.reject(leadId, sellerId, reason);
+        Lead lead = rejectedAssignment.lead;
+        List<Long> rejectedSellerIds = assignmentService.findRejectedSellerIds(lead.id);
+        List<SellerCandidate> nextCandidates = rankEligibleSellers(lead, rejectedSellerIds);
+
+        if (nextCandidates.isEmpty()) {
+            lead.seller = null;
+            lead.status = LeadStatus.NEW;
+            lead.updatedAt = rejectedAssignment.updatedAt;
+            return new RejectAssignmentResponse(
+                    true,
+                    rejectedAssignment.status,
+                    null,
+                    null,
+                    REJECTED_WITHOUT_NEXT_SELLER_MESSAGE
+            );
+        }
+
+        Assignment nextAssignment = assignmentService.assignLead(lead, nextCandidates.getFirst().seller());
+        return new RejectAssignmentResponse(
+                true,
+                rejectedAssignment.status,
+                nextAssignment.id,
+                nextAssignment.seller.id,
+                REJECTED_AND_REPROCESSED_MESSAGE
+        );
     }
 
     private MatchmakingResponse buildResponse(Lead lead) {
@@ -134,8 +174,13 @@ public class MatchmakingService {
     }
 
     List<SellerCandidate> rankEligibleSellers(Lead lead) {
+        return rankEligibleSellers(lead, List.of());
+    }
+
+    List<SellerCandidate> rankEligibleSellers(Lead lead, List<Long> excludedSellerIds) {
         LocalDate today = LocalDate.now();
         return sellerRepository.findActiveSellers().stream()
+                .filter(seller -> !excludedSellerIds.contains(seller.id))
                 .filter(seller -> isRegionCompatible(lead, seller))
                 .map(seller -> toCandidate(seller, currentLoad(seller, today)))
                 .filter(candidate -> candidate.currentLoad() < candidate.seller().dailyCapacity)
