@@ -1,0 +1,2 @@
+-- Baseline migration for Phase 0.
+-- Business tables are intentionally created in later roadmap phases.
