@@ -1,8 +1,10 @@
 package com.company.leaddistribution.matchmaking.service;
 
+import com.company.leaddistribution.assignment.entity.Assignment;
+import com.company.leaddistribution.assignment.service.AssignmentService;
+import com.company.leaddistribution.lead.entity.LeadStatus;
 import com.company.leaddistribution.lead.entity.Lead;
 import com.company.leaddistribution.lead.repository.LeadRepository;
-import com.company.leaddistribution.lead.service.LeadHistoryService;
 import com.company.leaddistribution.matchmaking.dto.MatchmakingResponse;
 import com.company.leaddistribution.matchmaking.dto.SellerRankingResponse;
 import com.company.leaddistribution.matchmaking.mapper.MatchmakingMapper;
@@ -20,20 +22,22 @@ import java.util.List;
 public class MatchmakingService {
 
     private static final String NO_ELIGIBLE_SELLER_MESSAGE = "Nenhum vendedor elegível foi encontrado";
+    private static final String NO_ELIGIBLE_SELLER_ASSIGNMENT_MESSAGE = "Nenhum vendedor elegível encontrado";
     private static final String ELIGIBLE_SELLER_FOUND_MESSAGE = "Vendedor elegível encontrado";
+    private static final String LEAD_ALREADY_ASSIGNED_MESSAGE = "Lead já atribuído";
 
     private final LeadRepository leadRepository;
     private final SellerRepository sellerRepository;
-    private final LeadHistoryService leadHistoryService;
+    private final AssignmentService assignmentService;
 
     public MatchmakingService(
             LeadRepository leadRepository,
             SellerRepository sellerRepository,
-            LeadHistoryService leadHistoryService
+            AssignmentService assignmentService
     ) {
         this.leadRepository = leadRepository;
         this.sellerRepository = sellerRepository;
-        this.leadHistoryService = leadHistoryService;
+        this.assignmentService = assignmentService;
     }
 
     @Transactional
@@ -41,13 +45,20 @@ public class MatchmakingService {
         Lead lead = leadRepository.findByIdOptional(leadId)
                 .orElseThrow(() -> new NotFoundException("Lead not found"));
 
-        MatchmakingResponse response = buildResponse(lead);
-        leadHistoryService.recordUpdated(
-                lead,
-                null,
-                "Matchmaking executado: " + response.ranking().size() + " vendedor(es) elegível(eis)"
-        );
-        return response;
+        if (lead.status == LeadStatus.ASSIGNED) {
+            return alreadyAssignedResponse(lead);
+        }
+
+        List<SellerCandidate> candidates = rankEligibleSellers(lead);
+        List<SellerRankingResponse> ranking = MatchmakingMapper.toRankingResponse(candidates);
+
+        if (ranking.isEmpty()) {
+            return noEligibleSellerResponse(lead, NO_ELIGIBLE_SELLER_ASSIGNMENT_MESSAGE);
+        }
+
+        Seller selectedSeller = candidates.getFirst().seller();
+        Assignment assignment = assignmentService.assignLead(lead, selectedSeller);
+        return assignedResponse(lead, assignment, ranking);
     }
 
     public MatchmakingResponse ranking(Long leadId) {
@@ -61,24 +72,64 @@ public class MatchmakingService {
         List<SellerRankingResponse> ranking = MatchmakingMapper.toRankingResponse(candidates);
 
         if (ranking.isEmpty()) {
-            return new MatchmakingResponse(
-                    lead.id,
-                    0,
-                    null,
-                    null,
-                    List.of(),
-                    NO_ELIGIBLE_SELLER_MESSAGE
-            );
+            return noEligibleSellerResponse(lead, NO_ELIGIBLE_SELLER_MESSAGE);
         }
 
         SellerRankingResponse selected = ranking.getFirst();
         return new MatchmakingResponse(
                 lead.id,
-                selected.rankingScore(),
+                0,
                 selected.sellerId(),
                 selected.sellerName(),
+                null,
+                null,
+                lead.status,
                 ranking,
                 ELIGIBLE_SELLER_FOUND_MESSAGE
+        );
+    }
+
+    private MatchmakingResponse assignedResponse(Lead lead, Assignment assignment, List<SellerRankingResponse> ranking) {
+        SellerRankingResponse selected = ranking.getFirst();
+        return new MatchmakingResponse(
+                lead.id,
+                0,
+                selected.sellerId(),
+                selected.sellerName(),
+                assignment.id,
+                assignment.status,
+                lead.status,
+                ranking,
+                ELIGIBLE_SELLER_FOUND_MESSAGE
+        );
+    }
+
+    private MatchmakingResponse alreadyAssignedResponse(Lead lead) {
+        Assignment assignment = assignmentService.findActiveByLeadId(lead.id).orElse(null);
+        return new MatchmakingResponse(
+                lead.id,
+                0,
+                lead.seller == null ? null : lead.seller.id,
+                lead.seller == null ? null : lead.seller.name,
+                assignment == null ? null : assignment.id,
+                assignment == null ? null : assignment.status,
+                lead.status,
+                List.of(),
+                LEAD_ALREADY_ASSIGNED_MESSAGE
+        );
+    }
+
+    private MatchmakingResponse noEligibleSellerResponse(Lead lead, String message) {
+        return new MatchmakingResponse(
+                lead.id,
+                0,
+                null,
+                null,
+                null,
+                null,
+                lead.status,
+                List.of(),
+                message
         );
     }
 
